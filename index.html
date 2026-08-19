@@ -176,11 +176,11 @@
         <!-- DAILY DYNAMIC METRICS -->
         <div class="admin-metrics">
             <div class="metric-card in-card">
-                <span>Punch IN Members (Today)</span>
+                <span>Punch IN Members</span>
                 <h3 id="metricPunchInCount" style="color: var(--success);">0</h3>
             </div>
             <div class="metric-card out-card">
-                <span>Punch OUT Members (Today)</span>
+                <span>Punch OUT Members</span>
                 <h3 id="metricPunchOutCount" style="color: var(--danger);">0</h3>
             </div>
             <div class="metric-card total-card">
@@ -270,7 +270,6 @@
     </div>
 
     <script>
-        // GOOGLE APP SCRIPT WEB APP LINK CONNECTED HERE
         const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwMBRUUkjkQfS1EAf07YBCmiQ9Le5GOHese52vsUKpeBpDF6tZfGXQtb3TKjyXyZn9x/exec";
 
         let defaultUsers = {
@@ -384,8 +383,11 @@
 
                 if (records && records.length > 0) {
                     localStorage.setItem('attendanceLogs', JSON.stringify(records));
+                    renderAdminLogsTable(records);
+                } else {
+                    const localRecords = JSON.parse(localStorage.getItem('attendanceLogs')) || [];
+                    renderAdminLogsTable(localRecords);
                 }
-                renderAdminLogsTable(records);
             } catch (err) {
                 const localRecords = JSON.parse(localStorage.getItem('attendanceLogs')) || [];
                 renderAdminLogsTable(localRecords);
@@ -404,29 +406,35 @@
             }
 
             records.slice().reverse().forEach(rec => {
+                const typeText = String(rec.type || '').toUpperCase();
+                const isIN = typeText.includes('IN');
                 const tr = document.createElement('tr');
                 tr.innerHTML = `
-                    <td>${rec.date} ${rec.time}</td>
-                    <td><strong>${rec.name}</strong></td>
-                    <td class="${rec.type === 'IN' ? 'punch-type-in' : 'punch-type-out'}">PUNCH ${rec.type}</td>
+                    <td>${rec.date || ''} ${rec.time || ''}</td>
+                    <td><strong>${rec.name || ''}</strong></td>
+                    <td class="${isIN ? 'punch-type-in' : 'punch-type-out'}">PUNCH ${isIN ? 'IN' : 'OUT'}</td>
                     <td>
-                        <span class="address-text">📍 ${rec.address}</span>
-                        <a class="location-link" href="${rec.locationUrl}" target="_blank">View Map</a>
+                        <span class="address-text">📍 ${rec.address || ''}</span>
+                        ${rec.locationUrl ? `<a class="location-link" href="${rec.locationUrl}" target="_blank">View Map</a>` : ''}
                     </td>
                 `;
                 attTbody.appendChild(tr);
             });
         }
 
+        // FIXED METRICS FUNCTION TO CORRECTLY COUNT IN & OUT LOGS
         function updateMetrics(recordsData) {
             const records = recordsData || JSON.parse(localStorage.getItem('attendanceLogs')) || [];
-            const todayStr = new Date().toLocaleDateString();
-
-            const todayRecords = records.filter(r => r.date === todayStr);
 
             let latestStatusPerUser = {};
-            todayRecords.forEach(r => {
-                latestStatusPerUser[r.userId || r.name] = r.type;
+            records.forEach(r => {
+                const userKey = r.userId || r.name;
+                const typeText = String(r.type || '').toUpperCase();
+                if (typeText.includes('IN')) {
+                    latestStatusPerUser[userKey] = 'IN';
+                } else if (typeText.includes('OUT')) {
+                    latestStatusPerUser[userKey] = 'OUT';
+                }
             });
 
             let punchInTodayCount = 0;
@@ -459,7 +467,7 @@
             const btnIcon = document.getElementById('btnIcon');
             const lastLog = getLastPunchState();
 
-            if (!lastLog || lastLog.type === 'OUT') {
+            if (!lastLog || String(lastLog.type).toUpperCase().includes('OUT')) {
                 btnText.innerText = "Punch IN";
                 btnIcon.innerText = "📍";
                 btn.className = "btn-circle btn-circle-in";
@@ -473,7 +481,7 @@
 
         function handlePunchToggle() {
             const lastLog = getLastPunchState();
-            if (!lastLog || lastLog.type === 'OUT') {
+            if (!lastLog || String(lastLog.type).toUpperCase().includes('OUT')) {
                 markAttendance('IN');
             } else {
                 markAttendance('OUT');
@@ -585,10 +593,11 @@
             }
 
             userLogs.slice(0, 5).forEach(rec => {
+                const isIN = String(rec.type).toUpperCase().includes('IN');
                 const tr = document.createElement('tr');
                 tr.innerHTML = `
                     <td>${rec.date} ${rec.time}</td>
-                    <td class="${rec.type === 'IN' ? 'punch-type-in' : 'punch-type-out'}">${rec.type}</td>
+                    <td class="${isIN ? 'punch-type-in' : 'punch-type-out'}">${isIN ? 'IN' : 'OUT'}</td>
                     <td><span class="address-text">📍 ${rec.address}</span></td>
                 `;
                 tbody.appendChild(tr);
